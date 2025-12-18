@@ -1,0 +1,278 @@
+<!DOCTYPE HTML>
+<!--
+	Massively by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>YOLO Project</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+	<body class="is-preload">
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Header -->
+					<header id="header">
+						<a href="index.html" class="logo">Main Page</a>
+					</header>
+
+				<!-- Nav -->
+					<nav id="nav">
+						<ul class="links">
+							<li><a href="index.html">Main</a></li>
+							<li><a href="resume.html">Resume</a></li>
+							<li class="active"><a href="index.html#projects">Projects</a></li>
+						</ul>
+						<ul class="icons">
+							<li><a href="https://www.linkedin.com/in/tessa-everett/" class="icon brands fa-linkedin-in"><span class="label">linkedin</span></a></li>
+							<li><a href="https://github.com/tjeverett1" class="icon brands fa-github"><span class="label">GitHub</span></a></li>
+						</ul>
+					</nav>
+
+				<div id="main">
+
+				<!-- Post -->
+				<section class="post">
+                <span class="date">Fall 2025</span>
+
+                <header class="minor">
+                    <h1 style="margin-bottom: 0.5em;">
+                    Predicting Protein Function
+                    </h1>
+
+                    <div style="display: flex; gap: 0.75em; flex-wrap: wrap;">
+                    <a href="index.html#projects" class="button small">Back</a>
+
+                    <!-- Update filename/path as needed -->
+                    <a href="images/AI_For_Healthcare_Final_Project.pdf"
+                        class="button small icon solid fa-download"
+                        download>
+                        Download Paper
+                    </a>
+
+                    <!-- Optional: link to code repo -->
+                    <!--
+                    <a href="https://github.com/yourname/yourrepo"
+                        class="button small icon brands fa-github">
+                        Code
+                    </a>
+                    -->
+                    </div>
+                </header>
+
+                <!-- Hero image (optional). Swap src to your preferred figure -->
+                <a href="#" class="image main">
+                    <img src="images/protein_architecture.png" alt="Gene Ontology DAG visualization" />
+                </a>
+
+                <p>
+                    One of the biggest gaps in modern biology is how fast we can sequence proteins versus how slowly we can
+                    experimentally determine what those proteins actually do. Databases are flooded with sequences, but functional
+                    annotations lag behind—and they’re unevenly distributed across organisms and protein families. That imbalance
+                    creates subtle traps for machine learning models: it’s easy to look good on paper while quietly memorizing
+                    annotation patterns instead of learning real biology.
+                </p>
+
+                <p>
+                    This project, completed for my <em>AI in Healthcare</em> class at MIT, was my attempt to confront that problem
+                    head-on. I built a Gene Ontology (GO) function prediction model using protein language model embeddings,
+                    trained it under positive–unlabeled supervision, and evaluated it using splits designed to expose shortcut learning.
+                    Below is how we approached it, what I learned, and how I’m planning to improve it.
+                </p>
+
+                <h2>The core issue: missing labels aren’t negatives</h2>
+                <p>
+                    GO annotation is fundamentally asymmetric. If a protein <em>has</em> a GO term, that’s usually reliable.
+                    If it <em>doesn’t</em>, that doesn’t mean the function is absent—it often just hasn’t been tested yet.
+                    Treating missing labels as negatives is convenient, but wrong, and it rewards models that learn dataset artifacts
+                    rather than biology.
+                </p>
+
+                <p>
+                    We trained our classifier using <strong>non-negative positive–unlabeled (nnPU) learning</strong>, which treats
+                    unannotated protein–term pairs as ambiguous rather than false. In practice, that meant some “easy” validation gains
+                    disappeared—but the model became more conservative and behaved better under true generalization tests.
+                </p>
+
+                <h2>Protein language models—used carefully</h2>
+                <p>
+                    We built on top of two strong, complementary protein language models:
+                </p>
+
+                <ul>
+                    <li><strong>ESM-2</strong>, which captures evolutionary patterns across large protein corpora</li>
+                    <li><strong>ProtT5</strong>, which provides a different view of sequence semantics and context</li>
+                </ul>
+
+                <p>
+                    Rather than fine-tuning these large models, we froze them and used their embeddings as features. We concatenated
+                    the ESM-2 and ProtT5 embeddings into a single representation, and we also added a small learned
+                    <strong>taxonomy embedding</strong> (based on NCBI taxon IDs) to give the model evolutionary context.
+                </p>
+
+                <p>
+                    The classifier itself was intentionally lightweight: a simple MLP on top of these representations. Keeping the head
+                    small made it easier to interpret what was happening and to focus on the parts of the pipeline that tend to make or
+                    break biological ML—loss functions, label noise, and evaluation design.
+                </p>
+
+                <!-- Optional image: architecture diagram -->
+                <a href="#" class="image ">
+                    <img src="images/go_heirarchy.png" alt="Model overview: PLM embeddings + taxonomy embedding + MLP head" />
+                </a>
+
+                <h2>Hierarchy matters (and we enforced it)</h2>
+                <p>
+                    The Gene Ontology isn’t a flat label space—it’s a directed acyclic graph. A model predicting a specific function
+                    while assigning a lower score to its parent term is biologically incoherent, but neural networks will happily do it
+                    unless you enforce the constraint.
+                </p>
+
+                <p>
+                    We implemented a simple ontology-aware post-processing step that enforces hierarchical consistency:
+                    every parent GO term’s score is at least as high as its children’s. This reduced obviously invalid outputs and improved
+                    interpretability.
+                </p>
+
+                <h2>The most important decision: how to split the data</h2>
+                <p>
+                    The biggest conceptual takeaway from this project came from evaluation—not modeling. We trained two versions of the model:
+                </p>
+
+                <ul>
+                    <li>
+                    <strong>Random split model</strong>: proteins are randomly divided into train/test
+                    </li>
+                    <li>
+                    <strong>Scaffold split model</strong>: entire protein families are held out to reduce homology leakage
+                    </li>
+                </ul>
+
+                <p>
+                    The random split model performed better on its own held-out set—which is exactly the issue. Random splits tend to leak
+                    homology, letting models succeed by matching near-duplicates instead of learning transferable sequence–function relationships.
+                    In contrast, scaffold splitting makes the task meaningfully harder and gives a more realistic sense of generalization.
+                </p>
+
+                <!-- Optional image: your Fmax curves (swap to your filenames) -->
+                <a href="#" class="image main">
+                    <img src="images/F1.png" alt="Weighted F-measure vs threshold for random vs scaffold evaluation" />
+                </a>
+
+                <h2>A more realistic test: CAFA-style time-delayed evaluation</h2>
+                <p>
+                    We also evaluated on the CAFA-style Kaggle benchmark, which is time-delayed: proteins gain new experimental annotations
+                    after model training. This tests something different from standard held-out splits—it asks whether the model can predict
+                    <em>new functions</em> (new labels) for proteins, including proteins it may have already seen.
+                </p>
+
+                <p>
+                    Under this regime, the scaffold-trained model outperformed the random model. That was the moment the project fully clicked:
+                    the model that “looked worse” on conventional splits was actually learning something more transferable.
+                </p>
+
+                <!-- Optional image: Kaggle scores -->
+                <a href="#" class="image main">
+                    <img src="images/kaggle_scores.png" alt="Kaggle weighted Fmax scores for random vs scaffold split models" />
+                </a>
+
+                <h2>What I learned</h2>
+                <ul>
+                    <li><strong>Evaluation is as important as architecture.</strong> A better split can matter more than a bigger model.</li>
+                    <li><strong>Biological structure should be used explicitly.</strong> Ontologies and taxonomies aren’t noise—they’re signal.</li>
+                    <li><strong>High validation accuracy can be misleading</strong> when labels are incomplete and correlations are strong.</li>
+                    <li><strong>Simple models are underrated.</strong> With strong representations + principled training, they go far—and are easier to debug.</li>
+                </ul>
+
+                <h2>How I want to improve this next</h2>
+                <p>
+                    If I extend this work, there are a few clear directions I’m excited about:
+                </p>
+
+                <ol>
+                    <li>
+                    <strong>Richer taxonomy modeling:</strong> replace the flat learned embedding with a hierarchical or graph-based
+                    representation of taxonomy to better handle unseen species.
+                    </li>
+                    <li>
+                    <strong>Better handling of rare GO terms:</strong> move beyond “top-k frequent terms” using information-content–aware
+                    objectives and ontology-aware label selection.
+                    </li>
+                    <li>
+                    <strong>Architecture experiments:</strong> test GO-DAG-aware models (e.g., GNNs over the ontology) and multimodal
+                    variants that incorporate predicted structure features.
+                    </li>
+                    <li>
+                    <strong>Failure mode analysis:</strong> systematically quantify where generalization breaks—especially across
+                    taxonomic boundaries and sparsely annotated branches.
+                    </li>
+                </ol>
+
+                <h2>Further reading</h2>
+                <p>
+                    If you want the full technical details—dataset construction, nnPU loss, hierarchy enforcement, and the full evaluation setup—
+                    you can read the complete write-up here:
+                </p>
+
+                <ul class="actions">
+                    <li>
+                    <a href="images/AI_For_Healthcare_Final_Project.pdf"
+                        class="button icon solid fa-download"
+                        download>
+                        Download the full project paper (PDF)
+                    </a>
+                    </li>
+                </ul>
+
+                </section>
+
+
+				</div>
+
+				<!-- Footer -->
+				<footer id="footer">
+				
+						<section class="alt">
+							<h3 style ="text-align: center">Address</h3>
+							<p style="text-align: center;"> Cambridge, MA<br />
+							</p>
+						</section> 
+						
+						<section>
+							<h3 style ="text-align: center">Email</h3>
+							<p style="text-align: center;"><a href="#">tjeveret@mit.edu</a></p>
+						</section>
+						<section>
+							<h3 style ="text-align: center">Social</h3>
+							<ul class="icons alt" style ="text-align: center">
+								<li><a href="https://www.linkedin.com/in/tessa-everett/" class="icon brands alt fa-linkedin-in"><span class="label">Twitter</span></a></li>
+								<li><a href="https://github.com/tjeverett1" class="icon brands alt fa-github"><span class="label">GitHub</span></a></li>
+							</ul>
+						
+					</section>
+				</footer>
+
+				<!-- Copyright -->
+					<!-- <div id="copyright">
+						<ul><li>&copy; Untitled</li><li>Design: <a href="https://html5up.net">HTML5 UP</a></li></ul>
+					</div> -->
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.scrollex.min.js"></script>
+			<script src="assets/js/jquery.scrolly.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>
